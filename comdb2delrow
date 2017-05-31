@@ -1,0 +1,73 @@
+#!/opt/swt/bin/python
+# Mohit Khullar
+import sys
+import bsddb
+import os
+import glob
+import datetime
+import threading
+
+odh = 0
+total_records = 0
+noprint=0
+
+if (len(sys.argv) == 1) :
+  print sys.argv[0], "<filename> key" 
+  print "eg:", sys.argv[0], "'book1*.datas*' 53b1c45c0ee50000" 
+  print ": ", sys.argv[0], "'book1*.datas*'"
+  print ": ", sys.argv[0], "'book1*.datas*' rowcount"
+  sys.exit()
+
+if (len(sys.argv) == 3) :
+    if(sys.argv[2] == 'rowcount') :
+      del sys.argv[2]
+      noprint=1;
+
+def is_ascii(s) :
+   return all(ord(c) < 128 for c in s)
+
+def printRow(key,value):
+    global noprint
+    if(noprint) :
+        return
+    elif (is_ascii(value)) :
+      print "key ", key.encode('hex'), 'length: ', len(value), ' value: ', value, ' hex: ', value.encode('hex')
+    else :  
+      print "key ", key.encode('hex'), 'length: ', len(value), ' hex value: ', value.encode('hex')
+
+def decToHex(n):
+  return format(int(n, base=10),'x')
+
+def parseDbFile(filename):
+  db = bsddb.btopen(filename, 'c')
+  records = 0
+  if (len(sys.argv) > 2) :
+      key = sys.argv[2]
+      new_key = 0
+      if (len(key) == 16 or len(key) > 24) :
+        new_key = key.decode('hex')
+      else : 
+        new_key = decToHex(key).decode('hex')
+      if (db.has_key(new_key) == 1) :
+        db.__delitem__(new_key)
+        sys.exit()
+  else :
+    print(filename)  
+    for a, b in db.iteritems():
+          value = b[odh:]
+          printRow(a, value)
+          records += 1
+    global total_records       
+    total_records += records
+
+  db.close()
+
+threads = []
+
+for filename in glob.glob(sys.argv[1]):
+  parseDbFile(filename)
+
+for thread in threads :
+    thread.join()
+
+print "total records", total_records
